@@ -1,0 +1,27 @@
+[
+    {
+        "ParameterKey": "EmailAddress",
+        "ParameterValue": "user@example.com"
+    },
+    {
+        "ParameterKey": "Schedule",
+        "ParameterValue": "15 6 * * ? *"
+    },
+    {
+        "ParameterKey": "FileSystemId",
+        "ParameterValue": "fs-0123456789abcdef0"
+    },
+    {
+        "ParameterKey": "Paths",
+        "ParameterValue": "/test"
+    },
+    {
+        "ParameterKey": "TaskCompletionReportPath",
+        "ParameterValue": "/fsx-drt-completion-reports"
+    },
+    {
+        "ParameterKey": "TaskType",
+        "ParameterValue": "Export"
+    }
+]
+

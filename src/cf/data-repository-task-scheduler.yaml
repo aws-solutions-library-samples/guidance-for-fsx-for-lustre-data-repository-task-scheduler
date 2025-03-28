@@ -1,0 +1,320 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Description: Creates an Amazon CloudWatch scheduled event that executes the fsx-create-data-repository-task API
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+    - Label:
+        default: Data Repository Task Scheduler
+      Parameters:
+        - FileSystemId
+        - Paths
+        - Schedule
+        - TaskType
+        - TaskCompletionReportPath
+        - EmailAddress
+    ParameterLabels:
+      EmailAddress:
+        default: Email address
+      Schedule:
+        default: Task schedule cron expression
+      FileSystemId:
+        default: File system id
+      Paths:
+        default: File system paths
+      TaskCompletionReportPath:
+        default: Task completion report path
+      TaskType:
+        default: Task type
+
+Parameters:
+  EmailAddress:
+    Description: The email address for CloudWatch alarm notification.
+    Type: String
+  Schedule:
+    Default: 0 0/6 * * ? *
+    Description: Task schedule via cron expression (cron format in UTC - [minute hour day/of/month month day/of/week year], e.g. every day @ 1:15pm UTC would be 15 13 ? * * *)
+    Type: String
+  FileSystemId:
+    AllowedPattern: ^(fs-)([a-z0-9]{17})$
+    Description: File system id
+    Type: String
+  Paths:
+    Default: /
+    Description: Paths to be included in the data repository task. Up to 32 unique paths can in included. Must follow this format (/dir1 /dir_2 "/dir 3" /dir4/file1)
+    Type: String
+  TaskCompletionReportPath:
+    Default: /fsx-drt-completion-reports
+    Description: Amazon S3 prefix to store task completion reports (prefix)
+    Type: String
+  TaskType:
+    AllowedValues:
+    - Export
+    - Import
+    Default: Export
+    Description: Task type (Export to repository or Import metadata from repository)
+    Type: String
+
+Mappings:
+  TaskType:
+    Export:
+      Value: EXPORT_TO_REPOSITORY
+    Import:
+      Value: IMPORT_METADATA_FROM_REPOSITORY
+
+Resources:
+  EventRule:
+    Type: AWS::Events::Rule
+    Properties: 
+      Description: Scheduled event to run the create data repository export task
+      Name: !Join [ '-', [ !Ref 'AWS::StackName', 'scheduled-event'] ]
+      ScheduleExpression: !Join [ '', [ 'cron(', !Ref Schedule, ')' ] ]
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt Function.Arn
+          Id: 1
+  FunctionPermission: 
+    Type: AWS::Lambda::Permission
+    Properties: 
+      FunctionName: !Ref Function
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventRule.Arn
+  Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          #!/usr/bin/env python3
+
+          import boto3
+          import botocore
+          import json
+          import os
+          import logging
+          from datetime import datetime
+
+          # Configure logging
+          logger = logging.getLogger()
+          logger.setLevel(logging.DEBUG)
+
+          # Add timestamp to logging format
+          logging.basicConfig(
+              format='%(asctime)s %(levelname)s %(message)s',
+              level=logging.DEBUG
+          )
+
+          class DateTimeEncoder(json.JSONEncoder):
+              def default(self, obj):
+                  if isinstance(obj, datetime):
+                      return obj.isoformat()
+                  return super().default(obj)
+
+          def serialize_datetime(obj):
+              """Convert datetime objects in a dict to ISO format strings"""
+              if isinstance(obj, dict):
+                  return {k: serialize_datetime(v) for k, v in obj.items()}
+              elif isinstance(obj, list):
+                  return [serialize_datetime(item) for item in obj]
+              elif isinstance(obj, datetime):
+                  return obj.isoformat()
+              return obj
+
+          def validate_env_vars(required_vars):
+              logger.debug(f"Validating environment variables: {required_vars}")
+              missing_vars = [var for var in required_vars if not os.environ.get(var)]
+              if missing_vars:
+                  raise ValueError(f"Missing environment variables: {', '.join(missing_vars)}")
+              return {var: os.environ[var] for var in required_vars}
+
+          def get_s3_path_from_dra(filesystemId):
+              logger.debug(f"Getting S3 path from DRA for filesystem: {filesystemId}")
+              try:
+                  fsx = boto3.client('fsx')
+                  response = fsx.describe_data_repository_associations(
+                      Filters=[{
+                          'Name': 'file-system-id',
+                          'Values': [filesystemId]
+                      }]
+                  )
+                  
+                  if not response['Associations']:
+                      raise ValueError("No Data Repository Associations found")
+                      
+                  for assoc in response['Associations']:
+                      if assoc['Lifecycle'] == 'AVAILABLE':
+                          return assoc['DataRepositoryPath']
+                          
+                  raise ValueError("No AVAILABLE Data Repository Associations found")
+                  
+              except Exception as e:
+                  logger.error(f"Error getting S3 path from DRA: {str(e)}")
+                  raise
+
+          def export(event, context):
+              try:
+                  logger.info(f"Starting export function with event: {json.dumps(event)}")
+                  
+                  # Get environment variables
+                  env_vars = validate_env_vars(['FILE_SYSTEM_ID', 'TASK_TYPE', 'COMPLETION_REPORT_PATH', 'FSX_PATHS'])
+                  logger.info(f"Environment variables loaded: {json.dumps(env_vars)}")
+                  
+                  # Create event dict from environment variables
+                  event = {
+                      'file_system_id': env_vars['FILE_SYSTEM_ID'],
+                      'paths': [env_vars['FSX_PATHS']],  # Wrap in list since paths should be a list
+                      'completion_report_path': env_vars['COMPLETION_REPORT_PATH']
+                  }
+                  logger.info(f"Created event from environment variables: {json.dumps(event)}")
+                  
+                  fsx = boto3.client('fsx')
+                  
+                  file_system_id = event['file_system_id']
+                  fsx_paths = event['paths']
+                  completion_report_path = event['completion_report_path']
+                  
+                  # Get DRA details and validate
+                  logger.info(f"Getting DRA details for filesystem: {file_system_id}")
+                  dra_details = get_dra_details(file_system_id)
+                  logger.info(f"DRA details retrieved: {json.dumps(dra_details)}")
+                  
+                  s3_base_path = dra_details['s3_path'].rstrip('/')
+                  
+                  task_params = {
+                      'FileSystemId': file_system_id,
+                      'Type': env_vars['TASK_TYPE'],
+                      'Paths': fsx_paths,
+                      'Report': {
+                          'Enabled': True,
+                          'Path': f"{s3_base_path}{completion_report_path}",
+                          'Format': 'REPORT_CSV_20191124',
+                          'Scope': 'FAILED_FILES_ONLY'
+                      }
+                  }
+                  
+                  logger.info(f"Creating data repository task with parameters: {json.dumps(task_params)}")
+                  
+                  try:
+                      response = fsx.create_data_repository_task(**task_params)
+                      logger.info(f"Successfully created repository task: {json.dumps(response, cls=DateTimeEncoder)}")
+                      # Serialize the response before returning
+                      return serialize_datetime(response)
+                  except botocore.exceptions.ClientError as e:
+                      logger.error(f"AWS API error: {str(e)}")
+                      if 'ResponseMetadata' in e.response:
+                          logger.error(f"Error response metadata: {json.dumps(e.response['ResponseMetadata'])}")
+                      raise
+                  
+              except Exception as e:
+                  logger.error(f"Unhandled exception: {str(e)}", exc_info=True)
+                  raise
+
+          def get_dra_details(filesystemId):
+              try:
+                  fsx = boto3.client('fsx')
+                  response = fsx.describe_data_repository_associations(
+                      Filters=[{
+                          'Name': 'file-system-id',
+                          'Values': [filesystemId]
+                      }]
+                  )
+                  
+                  if not response['Associations']:
+                      raise ValueError("No Data Repository Associations found")
+                      
+                  for assoc in response['Associations']:
+                      if assoc['Lifecycle'] == 'AVAILABLE':
+                          return {
+                              's3_path': assoc['DataRepositoryPath'],
+                              'fsx_path': assoc['FileSystemPath']
+                          }
+                          
+                  raise ValueError("No AVAILABLE Data Repository Associations found")
+                  
+              except Exception as e:
+                  logger.error(f"Error getting DRA details: {str(e)}")
+                  raise
+
+      Environment:
+        Variables:
+          FILE_SYSTEM_ID: !Ref FileSystemId
+          TASK_TYPE: !FindInMap [ TaskType, !Ref TaskType, Value ]
+          COMPLETION_REPORT_PATH: !Ref TaskCompletionReportPath
+          FSX_PATHS: !Ref Paths
+      Handler: index.export
+      Runtime: python3.12
+      Timeout: 30
+      Role: !GetAtt FunctionExecutionRole.Arn
+      TracingConfig:
+        Mode: Active
+
+
+  FunctionExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: root
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: 
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-*
+            - !Sub arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/${AWS::StackName}-*:*
+          - Effect: Allow
+            Action:
+            - xray:PutTraceSegments
+            - xray:PutTelemetryRecords
+            Resource: "*"
+          - Effect: Allow
+            Action:
+            - fsx:CreateDataRepositoryTask
+            Resource:
+            - arn:aws:fsx:*:*:task/*
+            - arn:aws:fsx:*:*:file-system/*
+          - Effect: Allow
+            Action:
+            - fsx:DescribeFileSystems
+            - fsx:DescribeDataRepositoryAssociations
+            Resource: "*"
+  ExportAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmActions:
+      - !Ref SNSTopicAlarm
+      AlarmDescription: !Join [ ' ', [ !Ref 'AWS::StackName', 'alarm' ] ]
+      AlarmName: !Join [ ' ', [ !Ref 'AWS::StackName', 'alarm' ] ]
+      ComparisonOperator: GreaterThanThreshold
+      Dimensions:
+      - Name: FunctionName
+        Value: !Ref Function
+      EvaluationPeriods: 1
+      MetricName: Errors
+      Namespace: AWS/Lambda
+      Period: 60
+      Statistic: Maximum
+      Threshold: 0
+      TreatMissingData: missing
+  SNSTopicAlarm: 
+    Type: AWS::SNS::Topic
+    Properties: 
+      DisplayName: !Join [ '-', [ !Ref 'AWS::StackName', 'alarm' ] ]
+      Subscription:
+      - Endpoint: !Ref EmailAddress
+        Protocol: "email"
+      TopicName: !Join [ '-', [ !Ref 'AWS::StackName', 'alarm' ] ]
