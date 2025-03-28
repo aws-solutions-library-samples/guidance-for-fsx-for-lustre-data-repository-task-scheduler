@@ -87,6 +87,10 @@ cd src/cf
     "ParameterValue": "your-email@example.com"
   },
   {
+    "ParameterKey": "Schedule",
+    "ParameterValue": "15 6 * * ? *"
+  },
+  {
     "ParameterKey": "FileSystemId",
     "ParameterValue": "fs-0123456789abcdef0"
   },
@@ -100,6 +104,26 @@ cd src/cf
   }
 ]
 ```
+### Schedule Configuration
+
+The Schedule parameter uses standard cron expression format with 6 fields:
+`minute hour day-of-month month day-of-week year`
+
+Examples:
+- `15 6 * * ? *` = Run at 6:15 AM UTC every day
+- `0 0/6 * * ? *` = Run every 6 hours
+- `0/5 * * * ? *` = Run every 5 minutes
+- `0 12 ? * MON-FRI *` = Run at noon UTC Monday through Friday
+
+Common settings:
+| Time Pattern | Description |
+| ------------ | ----------- |
+| `15 6 * * ? *` | Daily at 6:15 AM UTC |
+| `0 */12 * * ? *` | Every 12 hours |
+| `0 0 1 * ? *` | Monthly on the 1st at midnight UTC |
+| `0 8 ? * MON *` | Weekly on Monday at 8:00 AM UTC |
+
+Note: The `?` character is used in the day-of-month or day-of-week field to indicate "no specific value" when the other field has a specific value.
 
 4. Deploy the CloudFormation stack:
 
