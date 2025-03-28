@@ -17,10 +17,9 @@
 
 This Guidance provides a solution for scheduling and automating data repository tasks for Amazon FSx for Lustre file systems. It creates a CloudWatch scheduled event that triggers a Lambda function to execute FSx data repository tasks, allowing for automated import of metadata or export of data between FSx for Lustre and Amazon S3.
 
-[Architecture diagram placeholder]
+The solution works as follows:![Architecture diagram](assets/refarch.png)
 
-The solution works as follows:
-1. A CloudWatch event rule triggers the Lambda function on a schedule.
+1. An AWS EventBridge rule triggers the Lambda function on a schedule.
 2. The Lambda function retrieves the FSx for Lustre file system details and Data Repository Association (DRA) information.
 3. Based on the configured task type (import or export), the function creates a data repository task.
 4. The task execution is monitored, and any errors trigger a CloudWatch alarm, which sends a notification via SNS.
