@@ -1,216 +1,239 @@
 # Guidance for FSx for Lustre Data Repository Task Scheduler
 
+## Table of Contents
 
-The Guidance title should be consistent with the title established first in Alchemy.
-
-**Example:** *Guidance for Product Substitutions on AWS*
-
-This title correlates exactly to the Guidance it’s linked to, including its corresponding sample code repository. 
-
-
-## Table of Contents (required)
-
-List the top-level sections of the README template, along with a hyperlink to the specific section.
-
-### Required
-
-1. [Overview](#overview-required)
+1. [Overview](#overview)
     - [Cost](#cost)
-2. [Prerequisites](#prerequisites-required)
-    - [Operating System](#operating-system-required)
-3. [Deployment Steps](#deployment-steps-required)
-4. [Deployment Validation](#deployment-validation-required)
-5. [Running the Guidance](#running-the-guidance-required)
-6. [Next Steps](#next-steps-required)
-7. [Cleanup](#cleanup-required)
+2. [Prerequisites](#prerequisites)
+    - [Operating System](#operating-system)
+    - [AWS account requirements](#aws-account-requirements)
+3. [Deployment Steps](#deployment-steps)
+4. [Deployment Validation](#deployment-validation)
+5. [Running the Guidance](#running-the-guidance)
+6. [Next Steps](#next-steps)
+7. [Cleanup](#cleanup)
 
-***Optional***
+## Overview
 
-8. [FAQ, known issues, additional considerations, and limitations](#faq-known-issues-additional-considerations-and-limitations-optional)
-9. [Revisions](#revisions-optional)
-10. [Notices](#notices-optional)
-11. [Authors](#authors-optional)
+This Guidance provides a solution for scheduling and automating data repository tasks for Amazon FSx for Lustre file systems. It creates a CloudWatch scheduled event that triggers a Lambda function to execute FSx data repository tasks, allowing for automated import of metadata or export of data between FSx for Lustre and Amazon S3.
 
-## Overview (required)
+[Architecture diagram placeholder]
 
-1. Provide a brief overview explaining the what, why, or how of your Guidance. You can answer any one of the following to help you write this:
+The solution works as follows:
+1. A CloudWatch event rule triggers the Lambda function on a schedule.
+2. The Lambda function retrieves the FSx for Lustre file system details and Data Repository Association (DRA) information.
+3. Based on the configured task type (import or export), the function creates a data repository task.
+4. The task execution is monitored, and any errors trigger a CloudWatch alarm, which sends a notification via SNS.
 
-    - **Why did you build this Guidance?**
-    - **What problem does this Guidance solve?**
+### Cost
 
-2. Include the architecture diagram image, as well as the steps explaining the high-level overview and flow of the architecture. 
-    - To add a screenshot, create an ‘assets/images’ folder in your repository and upload your screenshot to it. Then, using the relative file path, add it to your README. 
+You are responsible for the cost of the AWS services used while running this Guidance. As of March 2025, the cost for running this Guidance with the default settings in the US East (N. Virginia) Region is approximately $5.00 per month for processing (assuming daily executions).
 
-### Cost ( required )
+We recommend creating a [Budget](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html) through [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/) to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this Guidance.
 
-This section is for a high-level cost estimate. Think of a likely straightforward scenario with reasonable assumptions based on the problem the Guidance is trying to solve. Provide an in-depth cost breakdown table in this section below ( you should use AWS Pricing Calculator to generate cost breakdown ).
-
-Start this section with the following boilerplate text:
-
-_You are responsible for the cost of the AWS services used while running this Guidance. As of <month> <year>, the cost for running this Guidance with the default settings in the <Default AWS Region (Most likely will be US East (N. Virginia)) > is approximately $<n.nn> per month for processing ( <nnnnn> records )._
-
-Replace this amount with the approximate cost for running your Guidance in the default Region. This estimate should be per month and for processing/serving resonable number of requests/entities.
-
-Suggest you keep this boilerplate text:
-_We recommend creating a [Budget](https://docs.aws.amazon.com/cost-management/latest/userguide/budgets-managing-costs.html) through [AWS Cost Explorer](https://aws.amazon.com/aws-cost-management/aws-cost-explorer/) to help manage costs. Prices are subject to change. For full details, refer to the pricing webpage for each AWS service used in this Guidance._
-
-### Sample Cost Table ( required )
-
-**Note : Once you have created a sample cost table using AWS Pricing Calculator, copy the cost breakdown to below table and upload a PDF of the cost estimation on BuilderSpace. Do not add the link to the pricing calculator in the ReadMe.**
+#### Sample Cost Table
 
 The following table provides a sample cost breakdown for deploying this Guidance with the default parameters in the US East (N. Virginia) Region for one month.
 
 | AWS service  | Dimensions | Cost [USD] |
 | ----------- | ------------ | ------------ |
-| Amazon API Gateway | 1,000,000 REST API calls per month  | $ 3.50month |
-| Amazon Cognito | 1,000 active users per month without advanced security feature | $ 0.00 |
+| AWS Lambda | 30 invocations per month, 128 MB memory, 30 second average duration | $0.00 |
+| Amazon CloudWatch | 1 custom metric, 1 alarm, 30 data points per month | $1.00 |
+| Amazon SNS | 10 email notifications per month | $0.00 |
+| AWS CloudFormation | Template and stack management | $0.00 |
 
-## Prerequisites (required)
+## Prerequisites
 
-### Operating System (required)
+### Operating System
 
-- Talk about the base Operating System (OS) and environment that can be used to run or deploy this Guidance, such as *Mac, Linux, or Windows*. Include all installable packages or modules required for the deployment. 
-- By default, assume Amazon Linux 2/Amazon Linux 2023 AMI as the base environment. All packages that are not available by default in AMI must be listed out.  Include the specific version number of the package or module.
+These deployment instructions are optimized to best work on Amazon Linux 2 AMI. Deployment in another OS may require additional steps.
 
-**Example:**
-“These deployment instructions are optimized to best work on **<Amazon Linux 2 AMI>**.  Deployment in another OS may require additional steps.”
+Required packages:
+- AWS CLI (version 2.x or later)
+- Python 3.8 or later
 
-- Include install commands for packages, if applicable.
+To install the AWS CLI on Amazon Linux 2:
 
+```bash
+curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+unzip awscliv2.zip
+sudo ./aws/install
+```
 
-### Third-party tools (If applicable)
+### AWS account requirements
 
-*List any installable third-party tools required for deployment.*
+- An existing Amazon FSx for Lustre file system
+- An S3 bucket associated with the FSx for Lustre file system via a Data Repository Association (DRA)
 
+## Deployment Steps
 
-### AWS account requirements (If applicable)
+1. Clone the repository:
 
-*List out pre-requisites required on the AWS account if applicable, this includes enabling AWS regions, requiring ACM certificate.*
+```bash
+git clone https://github.com/aws-solutions-library-samples/guidance-for-fsx-for-lustre-data-repository-task-scheduler.git
+```
 
-**Example:** “This deployment requires you have public ACM certificate available in your AWS account”
+2. Navigate to the cloned directory:
 
-**Example resources:**
-- ACM certificate 
-- DNS record
-- S3 bucket
-- VPC
-- IAM role with specific permissions
-- Enabling a Region or service etc.
+```bash
+cd src/cf
+```
 
+3. Create a parameters.json file with the following content, replacing the placeholder values:
 
-### aws cdk bootstrap (if sample code has aws-cdk)
+```json
+[
+  {
+    "ParameterKey": "EmailAddress",
+    "ParameterValue": "your-email@example.com"
+  },
+  {
+    "ParameterKey": "FileSystemId",
+    "ParameterValue": "fs-0123456789abcdef0"
+  },
+  {
+    "ParameterKey": "Paths",
+    "ParameterValue": "/drt-test"
+  },
+  {
+    "ParameterKey": "TaskType",
+    "ParameterValue": "Import"
+  }
+]
+```
 
-<If using aws-cdk, include steps for account bootstrap for new cdk users.>
+4. Deploy the CloudFormation stack:
 
-**Example blurb:** “This Guidance uses aws-cdk. If you are using aws-cdk for first time, please perform the below bootstrapping....”
+```bash
+aws cloudformation create-stack \
+  --stack-name fsx-drt-scheduler \
+  --template-body file://data-repository-task-scheduler.yaml \
+  --parameters file://parameters.json \
+  --capabilities CAPABILITY_IAM
+```
 
-### Service limits  (if applicable)
+5. Wait for the stack creation to complete:
 
-<Talk about any critical service limits that affect the regular functioning of the Guidance. If the Guidance requires service limit increase, include the service name, limit name and link to the service quotas page.>
+```aws cloudformation wait stack-create-complete --stack-name fsx-drt-scheduler```
 
-### Supported Regions (if applicable)
+## Deployment Validation
 
-<If the Guidance is built for specific AWS Regions, or if the services used in the Guidance do not support all Regions, please specify the Region this Guidance is best suited for>
+To validate the deployment:
 
+1. Check the CloudFormation stack status:
 
-## Deployment Steps (required)
+```bash
+aws cloudformation describe-stacks --stack-name fsx-drt-scheduler --query 'Stacks[0].StackStatus'
+```
 
-Deployment steps must be numbered, comprehensive, and usable to customers at any level of AWS expertise. The steps must include the precise commands to run, and describe the action it performs.
+The output should be "CREATE_COMPLETE".
 
-* All steps must be numbered.
-* If the step requires manual actions from the AWS console, include a screenshot if possible.
-* The steps must start with the following command to clone the repo. ```git clone xxxxxxx```
-* If applicable, provide instructions to create the Python virtual environment, and installing the packages using ```requirement.txt```.
-* If applicable, provide instructions to capture the deployed resource ARN or ID using the CLI command (recommended), or console action.
+2. Verify the Lambda function was created:
 
- 
-**Example:**
+```bash
+aws lambda list-functions --query 'Functions[?starts_with(FunctionName, `fsx-drt-scheduler`)].FunctionName'
+```
 
-1. Clone the repo using command ```git clone xxxxxxxxxx```
-2. cd to the repo folder ```cd <repo-name>```
-3. Install packages in requirements using command ```pip install requirement.txt```
-4. Edit content of **file-name** and replace **s3-bucket** with the bucket name in your account.
-5. Run this command to deploy the stack ```cdk deploy``` 
-6. Capture the domain name created by running this CLI command ```aws apigateway ............```
+You should see the name of the created Lambda function in the output.
 
+## Running the Guidance
 
+To manually trigger the data repository task:
 
-## Deployment Validation  (required)
+1. Invoke the Lambda function:
 
-<Provide steps to validate a successful deployment, such as terminal output, verifying that the resource is created, status of the CloudFormation template, etc.>
+```
+aws lambda invoke --function-name <function-name-from-previous-step> --payload '{}' output.json
+```
 
+2. Check the output:
 
-**Examples:**
+```
+cat output.json
+```
 
-* Open CloudFormation console and verify the status of the template with the name starting with xxxxxx.
-* If deployment is successful, you should see an active database instance with the name starting with <xxxxx> in        the RDS console.
-*  Run the following CLI command to validate the deployment: ```aws cloudformation describe xxxxxxxxxxxxx```
+You should see a response containing details about the created data repository task, including its TaskId and Lifecycle status.
 
+## Next Steps
 
+- Modify the Schedule parameter in the CloudFormation template to adjust the frequency of the data repository tasks.
+- Customize the Lambda function code to add additional logic or error handling as needed for your specific use case.
+- Integrate with other AWS services such as AWS Step Functions for more complex orchestration of data processing workflows.
 
-## Running the Guidance (required)
+## Cleanup
 
-<Provide instructions to run the Guidance with the sample data or input provided, and interpret the output received.> 
+To delete all resources created by this Guidance:
 
-This section should include:
+1. Delete the CloudFormation stack:
 
-* Guidance inputs
-* Commands to run
-* Expected output (provide screenshot if possible)
-* Output description
+```
+aws cloudformation delete-stack --stack-name fsx-drt-scheduler
+```
 
+2. Wait for the stack deletion to complete:
 
+```
+aws cloudformation wait stack-delete-complete --stack-name fsx-drt-scheduler
+```
 
-## Next Steps (required)
+Note: This will not delete your FSx for Lustre file system or associated S3 bucket. You will need to manage those resources separately.
 
-Provide suggestions and recommendations about how customers can modify the parameters and the components of the Guidance to further enhance it according to their requirements.
+## License
 
+MIT License
 
-## Cleanup (required)
+```plaintext
+Copyright (c) 2025 Amazon.com
 
-- Include detailed instructions, commands, and console actions to delete the deployed Guidance.
-- If the Guidance requires manual deletion of resources, such as the content of an S3 bucket, please specify.
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
 
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
 
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+```
 
-## FAQ, known issues, additional considerations, and limitations (optional)
+## Version History
 
+### 1.0.0 (2025-03-27)
+* Initial release
+* Import/Export functionality
+* CLI support
+* Lambda deployment support
+* Comprehensive error handling
+* Detailed completion reports
 
-**Known issues (optional)**
+## Support
 
-<If there are common known issues, or errors that can occur during the Guidance deployment, describe the issue and resolution steps here>
+* Open an issue for bug reports
+* Feature requests welcome
+* Pull requests encouraged
 
+## Authors
 
-**Additional considerations (if applicable)**
+**Romi Asad, romiasad@amazon.com, GitHub: romi1495**
 
-<Include considerations the customer must know while using the Guidance, such as anti-patterns, or billing considerations.>
+**Tom McDonald, tjm@amazon.com, GitHub: tjmaws**
 
-**Examples:**
+## Acknowledgments
 
-- “This Guidance creates a public AWS bucket required for the use-case.”
-- “This Guidance created an Amazon SageMaker notebook that is billed per hour irrespective of usage.”
-- “This Guidance creates unauthenticated public API endpoints.”
+* AWS FSx for Lustre team
+* Open source community
+* Original Project contributors
 
+**Darryl Osborne, darrylo@amazon.com,**
 
-Provide a link to the *GitHub issues page* for users to provide feedback.
+**Shrinath Kurdekar, kurdekar@amazon.com, GitHub: Shrinath Kurdekar**
 
-
-**Example:** *“For any feedback, questions, or suggestions, please use the issues tab under this repo.”*
-
-## Revisions (optional)
-
-Document all notable changes to this project.
-
-Consider formatting this section based on Keep a Changelog, and adhering to Semantic Versioning.
-
-## Notices (optional)
-
-Include a legal disclaimer
-
-**Example:**
-*Customers are responsible for making their own independent assessment of the information in this Guidance. This Guidance: (a) is for informational purposes only, (b) represents AWS current product offerings and practices, which are subject to change without notice, and (c) does not create any commitments or assurances from AWS and its affiliates, suppliers or licensors. AWS products or services are provided “as is” without warranties, representations, or conditions of any kind, whether express or implied. AWS responsibilities and liabilities to its customers are controlled by AWS agreements, and this Guidance is not part of, nor does it modify, any agreement between AWS and its customers.*
-
-
-## Authors (optional)
-
-Name of code contributors
+---
