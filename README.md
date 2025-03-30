@@ -130,6 +130,8 @@ The costs of the Amazon FSx for Lustre file system and associated Amazon Simple 
 
 ### AWS Management CloudFormation Console Deployment
 
+> **Download the CloudFormation template locally from [here](https://raw.githubusercontent.com/aws-solutions-library-samples/guidance-for-fsx-for-lustre-data-repository-task-scheduler/refs/heads/main/src/cf/data-repository-task-scheduler.yaml?token=GHSAT0AAAAAADBHVV565LP5ASAC7W2CGH6QZ7JP3FQ)**
+
 1. **Create Stack**
    - Navigate to CloudFormation console
    - Click "Create stack" (with new resources)
