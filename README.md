@@ -147,13 +147,6 @@ The costs of the Amazon FSx for Lustre file system and associated Amazon Simple 
    - Click "Next"
 
 4. **Configure Stack Options** (Optional)
-   - Add tags (key-value pairs)
-   - Set permissions
-   - Configure advanced options:
-     - Stack policy
-     - Rollback configuration
-     - Notification options
-     - Stack creation options
    - Click "Next"
 
 5. **Review**
@@ -193,7 +186,7 @@ git clone https://github.com/aws-solutions-library-samples/guidance-for-fsx-for-
 cd src/cf
 ```
 
-3. Create a parameters.json file with the following content, replacing the placeholder values:
+3. Create a parameters.json file with the following content, replacing the placeholder values as needed for your environment:
 
 ```json
 [
@@ -214,6 +207,10 @@ cd src/cf
     "ParameterValue": "/drt-test"
   },
   {
+    "ParameterKey": "TaskCompletionReportPath",
+    "ParameterValue": "/fsx-drt-completion-reports"
+  },
+  {
     "ParameterKey": "TaskType",
     "ParameterValue": "Import"
   }
@@ -231,27 +228,9 @@ cd src/cf
 | TaskCompletionReportPath | S3 prefix for task completion reports | Valid S3 path prefix | `/fsx-drt-completion-reports` | `/fsx-drt-completion-reports` |
 | TaskType | Type of repository task to execute | One of:<br>- `Export`<br>- `Import` | `Export` | `Export` |
 
-### TaskType Details
-
-#### Export Task (`EXPORT_TO_REPOSITORY`)
-- **API Translation**: `Type: EXPORT_TO_REPOSITORY`
-- **Function**: Exports data from FSx for Lustre to the linked S3 bucket
-- **Operation Details**:
-  - Writes modified files from FSx to S3
-  - Updates S3 objects to match FSx content
-  - Creates new objects in S3 for new files
-  - Maintains file metadata and permissions
-  - Generates completion report in specified S3 location
-
-#### Import Task (`IMPORT_METADATA_FROM_REPOSITORY`)
-- **API Translation**: `Type: IMPORT_METADATA_FROM_REPOSITORY`
-- **Function**: Updates FSx for Lustre metadata from linked S3 bucket
-- **Operation Details**:
-  - Updates file and directory listings in FSx
-  - Does not transfer actual file content
-  - Updates file metadata (size, timestamps)
-  - Adds new file entries for new S3 objects
-  - Generates completion report in specified S3 location
+```markdown
+> **Note about placeholder values**: Throughout this documentation, you'll see values wrapped in brackets like `<stack-name>`, `<function-name>`, `<stream-name>`, etc. These are placeholder values that you should replace with specific values. For example, if you named your CloudFormation stack "fsx-scheduler-prod", you would replace `<stack-name>` with `fsx-scheduler-prod`. Similarly, `<your-email@example.com>` should be replaced with your actual email address. Do not include the angle brackets (`<>`) in your template or commands.
+```
 
 ### Schedule Configuration
 
@@ -274,11 +253,33 @@ Common settings:
 
 Note: The `?` character is used in the day-of-month or day-of-week field to indicate "no specific value" when the other field has a specific value.
 
+### TaskType Details
+
+#### Value: Export
+- **API Translation**: `Type: EXPORT_TO_REPOSITORY`
+- **Function**: Exports data from FSx for Lustre to the linked S3 bucket
+- **Operation Details**:
+  - Writes modified files from FSx to S3
+  - Updates S3 objects to match FSx content
+  - Creates new objects in S3 for new files
+  - Maintains file metadata and permissions
+  - Generates completion report in specified S3 location
+
+#### Value: Import
+- **API Translation**: `Type: IMPORT_METADATA_FROM_REPOSITORY`
+- **Function**: Updates FSx for Lustre metadata from linked S3 bucket
+- **Operation Details**:
+  - Updates file and directory listings in FSx
+  - Does not transfer actual file content
+  - Updates file metadata (size, timestamps)
+  - Adds new file entries for new S3 objects
+  - Generates completion report in specified S3 location
+
 4. Deploy the CloudFormation stack:
 
 ```bash
 aws cloudformation create-stack \
-  --stack-name fsx-drt-scheduler \
+  --stack-name <stack-name> \
   --template-body file://data-repository-task-scheduler.yaml \
   --parameters file://parameters.json \
   --capabilities CAPABILITY_IAM
@@ -286,7 +287,7 @@ aws cloudformation create-stack \
 
 5. Wait for the stack creation to complete:
 
-```aws cloudformation wait stack-create-complete --stack-name fsx-drt-scheduler```
+```aws cloudformation wait stack-create-complete --stack-name <stack-name>```
 
 ## Deployment Validation
 
@@ -295,7 +296,7 @@ To validate the deployment:
 1. Check the CloudFormation stack status:
 
 ```bash
-aws cloudformation describe-stacks --stack-name fsx-drt-scheduler --query 'Stacks[0].StackStatus'
+aws cloudformation describe-stacks --stack-name <stack-name> --query 'Stacks[0].StackStatus'
 ```
 
 The output should be "CREATE_COMPLETE".
@@ -303,7 +304,7 @@ The output should be "CREATE_COMPLETE".
 2. Verify the Lambda function was created:
 
 ```bash
-aws lambda list-functions --query 'Functions[?starts_with(FunctionName, `fsx-drt-scheduler`)].FunctionName'
+aws lambda list-functions --query 'Functions[?starts_with(FunctionName, `<stack-name>`)].FunctionName'
 ```
 
 You should see the name of the created Lambda function in the output.
@@ -322,7 +323,7 @@ aws cloudformation describe-stacks \
 
 # Or get function name based on stack name pattern
 aws lambda list-functions \
-    --query 'Functions[?starts_with(FunctionName, `fsx-drt-scheduler`)].FunctionName' \
+    --query 'Functions[?starts_with(FunctionName, `<stack-name>`)].FunctionName' \
     --output text
 ```
 
@@ -479,7 +480,7 @@ SOFTWARE.
 
 ## Acknowledgments
 
-* Original Project contributors
+Original Project contributors
 
     **Darryl Osborne, darrylo@amazon.com**
 
