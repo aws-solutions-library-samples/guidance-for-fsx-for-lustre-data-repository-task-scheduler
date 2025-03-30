@@ -228,9 +228,7 @@ cd src/cf
 | TaskCompletionReportPath | S3 prefix for task completion reports | Valid S3 path prefix | `/fsx-drt-completion-reports` | `/fsx-drt-completion-reports` |
 | TaskType | Type of repository task to execute | One of:<br>- `Export`<br>- `Import` | `Export` | `Export` |
 
-```markdown
 > **Note about placeholder values**: Throughout this documentation, you'll see values wrapped in brackets like `<stack-name>`, `<function-name>`, `<stream-name>`, etc. These are placeholder values that you should replace with specific values. For example, if you named your CloudFormation stack "fsx-scheduler-prod", you would replace `<stack-name>` with `fsx-scheduler-prod`. Similarly, `<your-email@example.com>` should be replaced with your actual email address. Do not include the angle brackets (`<>`) in your template or commands.
-```
 
 ### Schedule Configuration
 
