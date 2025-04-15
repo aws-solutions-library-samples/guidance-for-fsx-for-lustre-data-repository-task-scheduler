@@ -119,6 +119,8 @@ The costs of the Amazon FSx for Lustre file system and associated Amazon Simple 
 - An S3 bucket with an active Data Repository Association (DRA)
 - A valid email address for notifications
 
+> **Note**: Ensure there is not an existing DRA that automates imports and exports. This solution is intended to create a scheduler for this functionality.  
+
 ### Technical Requirements
 - AWS CLI version 2.x or later (if deploying via CLI), or AWS CloudShell
 - Understanding of cron expressions for scheduling
@@ -350,6 +352,12 @@ The response should contain task details including TaskId and Lifecycle status.
 - **Error**: "InvalidParameterException" for paths
   - **Solution**: Ensure paths follow correct format and exist in filesystem
   - **Check**: Verify paths in FSx filesystem using Lustre client
+
+- **Error**: Status Code 200 "Unhandled" for function execution 
+  - **Solution**: Ensure `parameters.json` file is properly configured. 
+  - **Check**: Verify parameters defined in file are correct using an editor of your choice. 
+
+> **Note**: If the Lambda function has already been created using the `parameters.json` file, make sure the environment variables are also corrected using the Lambda Console. 
 
 #### Data Repository Task Failures
 - **Error**: "ValidationException" for DRA
