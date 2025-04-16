@@ -74,7 +74,7 @@ The solution works as follows:![Architecture diagram](assets/refarch.png)
 1. An AWS EventBridge rule triggers the Lambda function on a schedule.
 2. The Lambda function retrieves the FSx for Lustre file system details and Data Repository Association (DRA) information.
 3. Based on the configured task type (import or export), the function creates a data repository task.
-4. The task execution is monitored, and any errors trigger a CloudWatch alarm, which sends a notification via SNS.
+4. The scheduled Lambda that triggers the data repository task execution is monitored, and any errors trigger a CloudWatch alarm, which sends a notification via SNS.
 
 ### Cost
 
