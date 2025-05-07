@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: 2010-09-09
 
-Description: Creates an Amazon CloudWatch scheduled event that executes the fsx-create-data-repository-task API
+Description: Deployment for FSx for Lustre Data Repository Task Scheduler (SO9028).
 
 Metadata:
   AWS::CloudFormation::Interface:

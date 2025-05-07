@@ -2,7 +2,7 @@
 
 ## Table of Contents
 
-1. [Solution Overview](#solution-overview)
+1. [Guidance Overview](#guidance-overview)
     - [Cost](#cost)
 2. [Prerequisites](#prerequisites)
 3. [Core Services](#core-services)
@@ -12,13 +12,13 @@
 7. [Next Steps](#next-steps)
 8. [Cleanup](#cleanup)
 
-## Solution Overview
+## Guidance Overview
 
-This solution automates the scheduling and execution of FSx for Lustre data repository tasks through a serverless architecture. The solution deploys several integrated AWS services that work together to provide reliable, scheduled data synchronization between FSx for Lustre and Amazon S3.
+This guidance automates the scheduling and execution of FSx for Lustre data repository tasks through a serverless architecture. The guidance deploys several integrated AWS services that work together to provide reliable, scheduled data synchronization between FSx for Lustre and Amazon S3.
 
 ### Core Workflow
 
-The solution implements a scheduled workflow that operates as follows:
+The guidance implements a scheduled workflow that operates as follows:
 
 1. An Amazon EventBridge (CloudWatch Events) rule triggers the AWS Lambda function based on a user-defined schedule using cron expressions.
 
@@ -36,7 +36,7 @@ The solution implements a scheduled workflow that operates as follows:
 
 - **Task Execution**: The Lambda function uses the FSx API to create data repository tasks, supporting both IMPORT_METADATA_FROM_REPOSITORY and EXPORT_TO_REPOSITORY operations.
 
-- **Monitoring and Observability**: The solution implements comprehensive monitoring through:
+- **Monitoring and Observability**: The guidance implements comprehensive monitoring through:
   - CloudWatch Logs for Lambda function logging
   - CloudWatch Alarms for error detection
   - X-Ray for distributed tracing
@@ -44,7 +44,7 @@ The solution implements a scheduled workflow that operates as follows:
 
 ### Error Handling
 
-The solution includes the following error handling mechanisms:
+The guidance includes the following error handling mechanisms:
 - Validates all required environment variables before execution
 - Implements exception handling in the Lambda function
 - Creates CloudWatch alarms to monitor for execution failures
@@ -60,7 +60,7 @@ Security is implemented through:
 
 ### Customization and Scaling
 
-The solution can be customized through CloudFormation parameters, allowing users to configure:
+The guidance can be customized through CloudFormation parameters, allowing users to configure:
 - Schedule frequency using cron expressions
 - File system paths for synchronization
 - Task types (import/export)
@@ -69,7 +69,7 @@ The solution can be customized through CloudFormation parameters, allowing users
 
 This architecture ensures reliable, automated data synchronization between FSx for Lustre and S3 while maintaining operational visibility and control.
 
-The solution works as follows:![Architecture diagram](assets/refarch.png)
+The guidance works as follows:![Architecture diagram](assets/refarch.png)
 
 1. An AWS EventBridge rule triggers the Lambda function on a schedule.
 2. The Lambda function retrieves the FSx for Lustre file system details and Data Repository Association (DRA) information.
@@ -119,7 +119,7 @@ The costs of the Amazon FSx for Lustre file system and associated Amazon Simple 
 - An S3 bucket with an active Data Repository Association (DRA)
 - A valid email address for notifications
 
-> **Note**: Ensure there is not an existing DRA that automates imports and exports. This solution is intended to create a scheduler for this functionality.  
+> **Note**: Ensure there is not an existing DRA that automates imports and exports. This guidance is intended to create a scheduler for this functionality.  
 
 ### Technical Requirements
 - AWS CLI version 2.x or later (if deploying via CLI), or AWS CloudShell
@@ -132,7 +132,7 @@ The costs of the Amazon FSx for Lustre file system and associated Amazon Simple 
 
 ### AWS Management CloudFormation Console Deployment
 
-> **Download the CloudFormation template locally from [here](https://raw.githubusercontent.com/aws-solutions-library-samples/guidance-for-fsx-for-lustre-data-repository-task-scheduler/refs/heads/main/src/cf/data-repository-task-scheduler.yaml?token=GHSAT0AAAAAADBHVV565LP5ASAC7W2CGH6QZ7JP3FQ)**
+> **Download the CloudFormation template locally from [here](https://raw.githubusercontent.com/aws-guidances-library-samples/guidance-for-fsx-for-lustre-data-repository-task-scheduler/refs/heads/main/src/cf/data-repository-task-scheduler.yaml?token=GHSAT0AAAAAADBHVV565LP5ASAC7W2CGH6QZ7JP3FQ)**
 
 1. **Create Stack**
    - Navigate to CloudFormation console
@@ -179,7 +179,7 @@ sudo ./aws/install
 1. Clone the repository:
 
 ```bash
-git clone https://github.com/aws-solutions-library-samples/guidance-for-fsx-for-lustre-data-repository-task-scheduler.git
+git clone https://github.com/aws-guidances-library-samples/guidance-for-fsx-for-lustre-data-repository-task-scheduler.git
 ```
 
 2. Navigate to the cloned directory:
@@ -342,39 +342,39 @@ cat output.json
 
 The response should contain task details including TaskId and Lifecycle status.
 
-### Common Issues and Solutions
+### Common Issues and Guidances
 
 #### Lambda Function Failures
 - **Error**: "ResourceNotFoundException" for FSx filesystem
-  - **Solution**: Verify FileSystemId parameter is correct and filesystem exists
+  - **Guidance**: Verify FileSystemId parameter is correct and filesystem exists
   - **Check**: Use `aws fsx describe-file-systems` to list available systems
 
 - **Error**: "InvalidParameterException" for paths
-  - **Solution**: Ensure paths follow correct format and exist in filesystem
+  - **Guidance**: Ensure paths follow correct format and exist in filesystem
   - **Check**: Verify paths in FSx filesystem using Lustre client
 
 - **Error**: Status Code 200 "Unhandled" for function execution 
-  - **Solution**: Ensure `parameters.json` file is properly configured. 
+  - **Guidance**: Ensure `parameters.json` file is properly configured. 
   - **Check**: Verify parameters defined in file are correct using an editor of your choice. 
 
 > **Note**: If the Lambda function has already been created using the `parameters.json` file, make sure the environment variables are also corrected using the Lambda Console. 
 
 #### Data Repository Task Failures
 - **Error**: "ValidationException" for DRA
-  - **Solution**: Confirm Data Repository Association is active
+  - **Guidance**: Confirm Data Repository Association is active
   - **Check**: Use `aws fsx describe-data-repository-associations` command
 
 - **Error**: "ServiceQuotaExceededException"
-  - **Solution**: Wait for existing tasks to complete or request quota increase
+  - **Guidance**: Wait for existing tasks to complete or request quota increase
   - **Check**: Monitor task status in FSx console
 
 #### CloudWatch Alarms
 - **Issue**: Missing alarm notifications
-  - **Solution**: Verify SNS topic subscription confirmation
+  - **Guidance**: Verify SNS topic subscription confirmation
   - **Check**: Confirm email subscription in SNS console
 
 - **Issue**: False positive alarms
-  - **Solution**: Adjust alarm thresholds in CloudFormation template
+  - **Guidance**: Adjust alarm thresholds in CloudFormation template
   - **Check**: Review CloudWatch metrics for normal patterns
 
 ### Logging and Debugging
